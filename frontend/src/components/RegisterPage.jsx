@@ -369,13 +369,13 @@ const Register = () => {
                             }}
                             onMouseEnter={(e) => {
                                 if (!isLoading) {
-                                    e.target.style.transform = 'translateY(-2px)';
+                                    // e.target.style.transform = 'translateY(-2px)';
                                     e.target.style.boxShadow = '0 15px 35px rgba(205, 0, 30, 0.4)';
                                 }
                             }}
                             onMouseLeave={(e) => {
                                 if (!isLoading) {
-                                    e.target.style.transform = 'translateY(0)';
+                                    // e.target.style.transform = 'translateY(0)';
                                     e.target.style.boxShadow = '0 10px 25px rgba(205, 0, 30, 0.3)';
                                 }
                             }}
