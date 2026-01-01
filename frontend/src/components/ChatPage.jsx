@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { library } from '@fortawesome/fontawesome-svg-core';
-import { faMessage, faPaperPlane, faArrowAltCircleRight, faBars } from '@fortawesome/free-regular-svg-icons';
+// import { library } from '@fortawesome/fontawesome-svg-core';
+import { faMessage, faPaperPlane, faArrowAltCircleRight } from '@fortawesome/free-regular-svg-icons';
 // import { ShimmeringText } from "@/components/ui/shimmering-text"
 import { ShimmeringText } from './ui/shimmering-text';
 

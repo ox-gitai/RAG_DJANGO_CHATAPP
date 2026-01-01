@@ -453,13 +453,13 @@ const Register = () => {
                 </div>
 
                 {/* Footer Text */}
-                <p style={{
+                {/* <p style={{
                     textAlign: 'center',
                     color: '#6b7280',
                     fontSize: '11px'
                 }} className="fade-in-up-delay-5">
-                    {/* Make sure the backend server is running on http://127.0.0.1:8000 */}
-                </p>
+                    Make sure the backend server is running on http://127.0.0.1:8000
+                </p> */}
             </div>
         </div>
     );
