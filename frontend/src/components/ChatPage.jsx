@@ -524,9 +524,9 @@ const ChatPage = () => {
                     zIndex: 100,          // Ensure it stays on top
                     padding: '15px 20px',
                     // Glassmorphism
-                    background: 'rgba(15, 23, 42, 0.57)', // Translucent dark
-                    backdropFilter: 'blur(10px)',        // The blur effect
-                    WebkitBackdropFilter: 'blur(12px)',
+                    background: 'rgba(15, 23, 42, 0.37)', // Translucent dark
+                    backdropFilter: 'blur(7px)',        // The blur effect
+                    // WebkitBackdropFilter: 'blur(22px)',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
                     borderRadius: '22px',
                     margin: '10px',
@@ -583,9 +583,13 @@ const ChatPage = () => {
                     flex: 1,
                     overflowY: 'auto',
                     padding: '24px',
-                    paddingTop: '100px', // ADD THIS (Header height is ~60px + 20px breathing room)
+                    paddingTop: '100px',
+                    // --- ADD THE LINES BELOW ---
+                    paddingBottom: '40px', // Extra space so last message can clear the blur
                     display: 'flex',
-                    flexDirection: 'column'
+                    flexDirection: 'column',
+                    WebkitMaskImage: 'linear-gradient(to bottom, black 0%, black 90%, transparent 100%)',
+                    maskImage: 'linear-gradient(to bottom, black 0%, black 90%, transparent 100%)',
                 }}>
                     {currentMessages.length === 0 ? (
                         <div style={{
@@ -655,13 +659,16 @@ const ChatPage = () => {
 
                 {/* Input area */}
                 <div style={{
-                    // width:'75%',
                     display: 'flex',
                     justifyContent: 'center',
                     padding: '20px',
-                    background: 'rgba(20, 30, 48, 0)',
-                    backdropFilter: 'blur(10px)',
-                    borderTop: '1px solid rgba(255, 255, 255, 0)'
+                    // --- UPDATE THESE PROPERTIES ---
+                    // background: 'rgba(15, 23, 42, 0.57)', // Matches your header
+                    // backdropFilter: 'blur(12px)',         // Matches your header
+                    // WebkitBackdropFilter: 'blur(12px)',
+                    // borderTop: '1px solid rgba(255, 255, 255, 0.1)', // Soft border
+                    // borderRadius: '22px 22px 0 0',        // Optional: slight round at top to match header style
+                    // margin: '0 10px 10px 10px',     
                 }}>
                     <form onSubmit={sendMessage} style={{
                         display: 'flex',
