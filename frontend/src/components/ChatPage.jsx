@@ -512,17 +512,27 @@ const ChatPage = () => {
                 flex: 1,
                 display: 'flex',
                 flexDirection: 'column',
-                overflow: 'hidden'
+                overflow: 'hidden',
+                position: 'relative',
             }}>
                 {/* Header */}
                 <div style={{
+                    position: 'absolute', // FLOAT above the messages
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    zIndex: 100,          // Ensure it stays on top
                     padding: '15px 20px',
-                    background: 'rgba(64, 66, 70, 0.58)',
-                    backdropFilter: 'blur(5px)',
-                    borderBottom: '1px solid rgba(255, 255, 255, 0)',
+                    // Glassmorphism
+                    background: 'rgba(15, 23, 42, 0.57)', // Translucent dark
+                    backdropFilter: 'blur(10px)',        // The blur effect
+                    WebkitBackdropFilter: 'blur(12px)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: '22px',
+                    margin: '10px',
                     display: 'flex',
                     justifyContent: 'space-between',
-                    alignItems: 'center'
+                    alignItems: 'center',
                 }}>
                     <button
                         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -534,27 +544,16 @@ const ChatPage = () => {
                             borderRadius: '8px',
                             fontSize: '18px',
                             color: '#d1d5db',
-                            transition: 'all 0.2s'
-                        }}
-                        onMouseEnter={(e) => {
-                            e.target.style.background = 'rgba(255, 255, 255, 0.12)';
-                        }}
-                        onMouseLeave={(e) => {
-                            e.target.style.background = 'rgba(255, 255, 255, 0.08)';
                         }}
                     >
                         ☰
-                        {/* <FontAwesomeIcon icon={faBars} /> */}
                     </button>
                     <h1 style={{
                         margin: 0,
                         fontSize: '18px',
                         fontWeight: 600,
                         color: 'white',
-                        maxWidth: '60%',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap'
+                        textShadow: '0 2px 4px rgba(0,0,0,0.3)'
                     }}>
                         {currentConversationId 
                             ? conversations.find(c => c.id === currentConversationId)?.title || 'Chat'
@@ -584,6 +583,7 @@ const ChatPage = () => {
                     flex: 1,
                     overflowY: 'auto',
                     padding: '24px',
+                    paddingTop: '100px', // ADD THIS (Header height is ~60px + 20px breathing room)
                     display: 'flex',
                     flexDirection: 'column'
                 }}>
@@ -655,6 +655,9 @@ const ChatPage = () => {
 
                 {/* Input area */}
                 <div style={{
+                    // width:'75%',
+                    display: 'flex',
+                    justifyContent: 'center',
                     padding: '20px',
                     background: 'rgba(20, 30, 48, 0)',
                     backdropFilter: 'blur(10px)',
@@ -671,6 +674,7 @@ const ChatPage = () => {
                             placeholder="Type your message..."
                             disabled={isLoading}
                             style={{
+                                width:'800px',
                                 flex: 1,
                                 padding: '12px 16px',
                                 background: 'rgba(255, 255, 255, 0.05)',
