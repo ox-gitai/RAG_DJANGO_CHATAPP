@@ -1,50 +1,63 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 
-const Login = () => {
+const Register = () => {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
     const [message, setMessage] = useState('');
     const [messageType, setMessageType] = useState(''); // 'success' or 'error'
     const [isLoading, setIsLoading] = useState(false);
     const navigate = useNavigate();
 
-    const handleSubmit = async (e) => {
+    const handleRegister = async (e) => {
         e.preventDefault();
         setMessage('');
         setMessageType('');
+
+        if (password !== confirmPassword) {
+            setMessage('Passwords do not match!');
+            setMessageType('error');
+            return;
+        }
+
+        if (password.length < 6) {
+            setMessage('Password must be at least 6 characters long!');
+            setMessageType('error');
+            return;
+        }
+
         setIsLoading(true);
 
         try {
-            const response = await fetch('http://127.0.0.1:8000/api/token/', {
+            const response = await fetch('http://127.0.0.1:8000/api/register/', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    username: username.trim(),
-                    password: password
-                })
+                body: JSON.stringify({ username, password })
             });
 
             const data = await response.json();
 
             if (response.ok) {
-                localStorage.setItem('access_token', data.access);
-                localStorage.setItem('refresh_token', data.refresh);
-                
-                setMessage('Login Successful!');
+                setMessage('Registration successful! Redirecting to login...');
                 setMessageType('success');
-                
                 setTimeout(() => {
-                    navigate('/conversation');
-                }, 800);
+                    navigate('/login');
+                }, 1500);
             } else {
-                setMessage('Invalid credentials. Please try again.');
+                if (data.username) {
+                    setMessage(`Error: ${data.username[0]}`);
+                } else if (data.password) {
+                    setMessage(`Error: ${data.password[0]}`);
+                } else {
+                    setMessage('Registration failed. Please try again.');
+                }
                 setMessageType('error');
             }
         } catch (error) {
-            console.error('Network Error:', error);
+            console.error('Network error:', error);
             setMessage('Server is down or unreachable');
             setMessageType('error');
         } finally {
@@ -120,6 +133,10 @@ const Login = () => {
                 .fade-in-up-delay-3 { animation-delay: 0.3s; }
                 .fade-in-up-delay-4 { animation-delay: 0.4s; }
                 .fade-in-up-delay-5 { animation-delay: 0.5s; }
+                @keyframes spin {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
+                }
             `}</style>
 
             <div style={{
@@ -146,8 +163,8 @@ const Login = () => {
                             marginBottom: '1rem'
                         }}>
                             <div style={{
-                                width: '48px',
-                                height: '48px',
+                                width: '50px',
+                                height: '50px',
                                 background: 'linear-gradient(135deg, #cd001e 0%, #e63946 100%)',
                                 borderRadius: '12px',
                                 display: 'flex',
@@ -156,6 +173,7 @@ const Login = () => {
                                 boxShadow: '0 10px 25px rgba(205, 0, 30, 0.4)',
                                 fontSize: '24px'
                             }}>
+                                {/* LOGO */}
                                 <img src="/logo_S_white.png" 
                                     alt="Icon"
                                     style={{
@@ -170,11 +188,11 @@ const Login = () => {
                             fontWeight: 700,
                             color: 'white',
                             marginBottom: '0.5rem'
-                        }}>Welcome Back</h1>
+                        }}>Create Account</h1>
                         <p style={{
                             color: '#adb5bd',
                             fontSize: '14px'
-                        }}>Sign in to your account to continue</p>
+                        }}>Sign up to get started</p>
                     </div>
 
                     {/* Message Alert */}
@@ -206,7 +224,7 @@ const Login = () => {
                     )}
 
                     {/* Form */}
-                    <form onSubmit={handleSubmit} style={{ marginBottom: '1.5rem' }}>
+                    <form onSubmit={handleRegister} style={{ marginBottom: '1.5rem' }}>
                         {/* Username Field */}
                         <div style={{ marginBottom: '1rem' }} className="fade-in-up-delay-2">
                             <label style={{
@@ -222,7 +240,7 @@ const Login = () => {
                                 onChange={(e) => setUsername(e.target.value)}
                                 required
                                 disabled={isLoading}
-                                placeholder="Enter your username"
+                                placeholder="Choose a username"
                                 style={{
                                     width: '100%',
                                     padding: '12px 16px',
@@ -247,7 +265,7 @@ const Login = () => {
                         </div>
 
                         {/* Password Field */}
-                        <div style={{ marginBottom: '1.5rem' }} className="fade-in-up-delay-3">
+                        <div style={{ marginBottom: '1rem' }} className="fade-in-up-delay-3">
                             <label style={{
                                 display: 'block',
                                 fontSize: '13px',
@@ -261,7 +279,46 @@ const Login = () => {
                                 onChange={(e) => setPassword(e.target.value)}
                                 required
                                 disabled={isLoading}
-                                placeholder="Enter your password"
+                                placeholder="Minimum 6 characters"
+                                style={{
+                                    width: '100%',
+                                    padding: '12px 16px',
+                                    borderRadius: '10px',
+                                    background: 'rgba(255, 255, 255, 0.05)',
+                                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                                    color: 'white',
+                                    fontSize: '14px',
+                                    transition: 'all 0.3s ease',
+                                    boxSizing: 'border-box',
+                                    opacity: isLoading ? 0.5 : 1
+                                }}
+                                onFocus={(e) => {
+                                    e.target.style.background = 'rgba(255, 255, 255, 0.1)';
+                                    e.target.style.borderColor = 'rgba(205, 0, 30, 0.5)';
+                                }}
+                                onBlur={(e) => {
+                                    e.target.style.background = 'rgba(255, 255, 255, 0.05)';
+                                    e.target.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                                }}
+                            />
+                        </div>
+
+                        {/* Confirm Password Field */}
+                        <div style={{ marginBottom: '1.5rem' }} className="fade-in-up-delay-3">
+                            <label style={{
+                                display: 'block',
+                                fontSize: '13px',
+                                fontWeight: 600,
+                                color: '#d1d5db',
+                                marginBottom: '0.5rem'
+                            }}>Confirm Password</label>
+                            <input
+                                type="password"
+                                value={confirmPassword}
+                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                required
+                                disabled={isLoading}
+                                placeholder="Confirm your password"
                                 style={{
                                     width: '100%',
                                     padding: '12px 16px',
@@ -337,11 +394,11 @@ const Login = () => {
                                         borderLeft: '2px solid rgba(255, 255, 255, 0.2)',
                                         animation: 'spin 0.8s linear infinite'
                                     }} />
-                                    Signing in...
+                                    Creating account...
                                 </>
                             ) : (
                                 <>
-                                    Sign In
+                                    Create Account
                                 </>
                             )}
                         </button>
@@ -363,7 +420,7 @@ const Login = () => {
                             padding: '0 12px',
                             color: '#6b7280',
                             fontSize: '12px'
-                        }}>New user?</span>
+                        }}>Have an account?</span>
                         <div style={{
                             flex: 1,
                             height: '1px',
@@ -371,16 +428,16 @@ const Login = () => {
                         }} />
                     </div>
 
-                    {/* Register Link */}
+                    {/* Login Link */}
                     <p style={{
                         textAlign: 'center',
                         color: '#9ca3af',
                         fontSize: '13px',
                         marginBottom: 0
                     }} className="fade-in-up-delay-5">
-                        Don't have an account?{' '}
+                        Already registered?{' '}
                         <Link
-                            to="/register"
+                            to="/login"
                             style={{
                                 color: '#f87171',
                                 textDecoration: 'none',
@@ -390,7 +447,7 @@ const Login = () => {
                             onMouseEnter={(e) => e.target.style.color = '#fca5a5'}
                             onMouseLeave={(e) => e.target.style.color = '#f87171'}
                         >
-                            Create one
+                            Sign in
                         </Link>
                     </p>
                 </div>
@@ -401,18 +458,11 @@ const Login = () => {
                     color: '#6b7280',
                     fontSize: '11px'
                 }} className="fade-in-up-delay-5">
-                    Make sure the backend server is running on http://127.0.0.1:8000
+                    {/* Make sure the backend server is running on http://127.0.0.1:8000 */}
                 </p>
             </div>
-
-            <style>{`
-                @keyframes spin {
-                    from { transform: rotate(0deg); }
-                    to { transform: rotate(360deg); }
-                }
-            `}</style>
         </div>
     );
 };
 
-export default Login;
+export default Register;

@@ -4,7 +4,7 @@ import './index.css';
 import App from './App';
 import Login from './components/Login';
 import ChatPage from './components/ChatPage'
-import Register from './components/Register';
+import Register from './components/RegisterPage';
 import reportWebVitals from './reportWebVitals';
 import { RouterProvider } from 'react-router-dom';
 import { Link } from 'react-router-dom';
