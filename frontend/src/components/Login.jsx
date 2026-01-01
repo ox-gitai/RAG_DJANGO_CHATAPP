@@ -133,7 +133,7 @@ const Login = () => {
                     backdropFilter: 'blur(16px)',
                     background: 'rgba(255, 255, 255, 0.08)',
                     border: '1px solid rgba(255, 255, 255, 0.15)',
-                    borderRadius: '20px',
+                    borderRadius: '25px',
                     boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
                     padding: '2rem',
                     marginBottom: '1.5rem'
@@ -292,7 +292,7 @@ const Login = () => {
                             style={{
                                 width: '100%',
                                 padding: '12px 16px',
-                                borderRadius: '10px',
+                                borderRadius: '20px',
                                 background: isLoading
                                     ? 'rgba(107, 114, 128, 0.5)'
                                     : 'linear-gradient(135deg, #cd001e 0%, #e63946 100%)',
