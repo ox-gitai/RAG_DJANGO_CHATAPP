@@ -5,7 +5,8 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faMessage, faPaperPlane, faArrowAltCircleRight } from '@fortawesome/free-regular-svg-icons';
 // import { ShimmeringText } from "@/components/ui/shimmering-text"
 import { ShimmeringText } from './ui/shimmering-text';
-
+import { useStore } from './Store';
+// import { Provider } from 'zustand';
 // library.add(faMessage, faTrashCan);
 
 const ChatPage = () => {
@@ -17,6 +18,11 @@ const ChatPage = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [error, setError] = useState('');
+    
+    // const [isLogin, setIsLogin] = useState(false);
+    // const { isLogin, setIsLogin } = useStore();
+    const isLogin = useStore((state) => state.isLogin);
+    console.log(isLogin);
     const messagesEndRef = useRef(null);
 
     const API_BASE_URL = 'http://127.0.0.1:8000';
@@ -30,13 +36,156 @@ const ChatPage = () => {
         scrollToBottom();
     }, [currentMessages]);
 
+
+    
+    
+    
+    // const refreshToken = async () => {
+        //     if(localStorage.getItem('refresh_token')!==null){
+            //         const refreshToken = localStorage.getItem('refresh_token');
+            
+            //         const response = await fetch(`${API_BASE_URL}/api/token/refresh/`, {
+                //             method: 'POST',
+                //             headers: {
+                    //                 'Content-Type': 'application/json',
+                    //             },
+                    //             // body: JSON.stringify({ refresh: refreshToken }),
+                    //             body: {
+                        //                 'refresh': refreshToken
+                        //             }
+                        //         });
+                        //         const data = await response.json();
+                        //         console.log(data)
+                        //         if (response.ok) {
+                            //             localStorage.setItem('access_token', data.access);
+                            //             return data.access;
+                            //         } else {
+                                //             // navigate('/login');
+                                //             return null;
+                                //         }
+                                //     } else {
+                                    //         return localStorage.getItem('access_token');
+                                    //     }
+                                    // }
+                                    
+                                    // // Example (Conceptual) for checking expiry
+                                    // const parseJwt = (token) => {
+                                        //     try {
+                                            //         const user = parseJwt(token);
+                                            //         const expiration = user?.exp;
+                                            //         if (expiration) {
+                                                //             return JSON.parse(atob(token.split('.')[1]));
+                                                //         }
+                                                //     } catch (e) {
+                                                    //         return {};
+                                                    //     }
+                                                    // };
+                                                    
+                                                    // const checkAndRefresh = async () => {
+    //     const token = localStorage.getItem('accessToken');
+    //     const decoded = parseJwt(token);
+    //     const currentTime = Math.floor(Date.now() / 1000);
+    
+    //     if (decoded.exp < currentTime + 60) { // Refresh if expiring in the next 60s
+    //         const newTokens = await refreshToken(); // Call your refresh token API
+    //         localStorage.setItem('accessToken', newTokens.access_token);
+    //         localStorage.setItem('refreshToken', newTokens.refresh_token); // Store new refresh token too!
+    //     }
+    // };
+    
+    const refreshToken = async () => {
+        const refresh = localStorage.getItem('refresh_token'); 
+        if (refresh) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/token/refresh/`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ refresh: refresh }) 
+                });
+                
+                const data = await response.json();
+                if (response.ok) {
+                    
+                    localStorage.setItem('access_token', data.access);
+                  
+                    if (data.refresh) {
+                        localStorage.setItem('refresh_token', data.refresh);
+                    }
+                    return data.access;
+                } else {
+                    // Handling logout or redirect here
+                    return null;
+                }
+            } catch (error) {
+                console.error("Token refresh failed", error);
+                return null;
+            }
+        } else {
+            return localStorage.getItem('access_token');
+        }
+    };
+
+    const parseJwt = (token) => {
+        try {
+            if (!token) return {};
+
+            const base64Url = token.split('.')[1];
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            // const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function(c) {
+            //     return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+            // }).join(''));
+            const jsonPayload = window.atob(base64)
+            return JSON.parse(jsonPayload);
+        } catch (e) {
+            return {};
+        }
+    };
+
+    const checkAndRefresh = async () => {
+       
+        const token = localStorage.getItem('access_token'); 
+        if (!token) return;
+
+        const decoded = parseJwt(token);
+        const currentTime = Math.floor(Date.now() / 1000);
+
+        // Check if token exists and is expiring soon
+        if (!decoded.exp || decoded.exp < currentTime + 10) { 
+            const newAccessToken = await refreshToken();
+            
+            if (newAccessToken) {
+                // Token is already set in localStorage by refreshToken(), 
+                // but if you need to use it immediately, it's available here.
+                console.log("Token refreshed successfully");
+            }
+        }
+    };
+    
     // Get access token from localStorage
-    const getAuthHeaders = () => {
+    const getAuthHeaders = async () => {
+        await checkAndRefresh();
         const token = localStorage.getItem('access_token');
-        return {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-        };
+        // const token = refresh_access_token();
+            return {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            };
+    //     if (!isLogin) {
+    //         const token = localStorage.getItem('access_token');
+    //         // const token = refresh_access_token();
+    //         return {
+    //             'Content-Type': 'application/json',
+    //             'Authorization': `Bearer ${token}`
+    //         };
+    //     } else {
+    //     const token = refresh_access_token();
+    //     return {
+    //         'Content-Type': 'application/json',
+    //         'Authorization': `Bearer ${token}`
+    //     };
+    // }
     };
 
     // Check authentication on mount
@@ -58,7 +207,7 @@ const ChatPage = () => {
             const response = await fetch(
                 `${API_BASE_URL}/conversations/`,
                 {
-                    headers: getAuthHeaders()
+                    headers: await getAuthHeaders()
                 }
             );
 
@@ -84,7 +233,7 @@ const ChatPage = () => {
                 `${API_BASE_URL}/conversations/create/`,
                 {
                     method: 'POST',
-                    headers: getAuthHeaders(),
+                    headers: await getAuthHeaders(),
                     body: JSON.stringify({})
                 }
             );
@@ -111,7 +260,7 @@ const ChatPage = () => {
             const response = await fetch(
                 `${API_BASE_URL}/conversations/${conversationId}/`,
                 {
-                    headers: getAuthHeaders()
+                    headers: await getAuthHeaders()
                 }
             );
 
@@ -216,7 +365,7 @@ const ChatPage = () => {
                     : `${API_BASE_URL}/conversations/create/`,
                 {
                     method: 'POST',
-                    headers: getAuthHeaders(),
+                    headers: await getAuthHeaders(),
                     body: JSON.stringify({
                         messages: finalMessages
                     })
@@ -264,7 +413,7 @@ const ChatPage = () => {
                 `${API_BASE_URL}/conversations/${conversationId}/delete/`,
                 {
                     method: 'DELETE',
-                    headers: getAuthHeaders()
+                    headers: await getAuthHeaders()
                 }
             );
 
@@ -289,6 +438,12 @@ const ChatPage = () => {
         navigate('/login');
     };
 
+    // const logResponse = () => {
+    //     console.log(currentMessages)
+    // }
+    useEffect( () => {
+        // console.log(currentMessages[1])
+    },[currentMessages]) 
     return (
         <div style={{
             display: 'flex',
@@ -461,6 +616,7 @@ const ChatPage = () => {
                                             cursor: 'pointer',
                                             padding: '0 5px',
                                             fontSize: '18px',
+                                            // marginTop: "-2px",
                                             transition: 'color 0.2s'
                                         }}
                                         onMouseEnter={(e) => e.target.style.color = '#fca5a5'}
@@ -566,12 +722,14 @@ const ChatPage = () => {
                 {error && (
                     <div style={{
                         padding: '12px 20px',
+                        marginTop: '100px', // To avoid overlap with header
                         background: 'rgba(239, 68, 68, 0.15)',
                         color: '#fca5a5',
                         borderBottom: '1px solid rgba(239, 68, 68, 0.3)',
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '8px'
+                        gap: '8px',
+                        // marginTop:"2px"
                     }}>
                         <span>⚠️</span>
                         {error}
@@ -706,6 +864,7 @@ const ChatPage = () => {
                             type="submit"
                             title="Send"
                             disabled={isLoading || !inputMessage.trim()}
+                            // onClick={logResponse}
                             style={{
                                 padding: '12px 20px',
                                 background: isLoading

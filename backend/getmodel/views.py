@@ -52,7 +52,10 @@ def chat_stream_view(request):
                         "done": True
                     }) + "\n"
                     return
+                # print(response)
                 
+                # yield json.dump(response)
+                print(response.iter_lines())
                 for line in response.iter_lines():
                     if line:
                         try:

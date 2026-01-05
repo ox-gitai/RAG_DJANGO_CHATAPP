@@ -34,6 +34,7 @@ export default function ChatPage() {
 
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
+  
 
   // --- BACKEND FETCH LOGIC ---
   useEffect(() => {

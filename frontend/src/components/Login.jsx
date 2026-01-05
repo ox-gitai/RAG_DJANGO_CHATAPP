@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-
+import { useStore } from './Store';
 const Login = () => {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
@@ -8,6 +8,7 @@ const Login = () => {
     const [messageType, setMessageType] = useState(''); // 'success' or 'error'
     const [isLoading, setIsLoading] = useState(false);
     const navigate = useNavigate();
+    const { setIsLogin } = useStore();
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -35,6 +36,7 @@ const Login = () => {
                 
                 setMessage('Login Successful!');
                 setMessageType('success');
+                setIsLogin(true);
                 
                 setTimeout(() => {
                     navigate('/conversation');
