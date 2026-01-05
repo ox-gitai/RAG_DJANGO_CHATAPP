@@ -5,7 +5,7 @@ app_name = 'getmodel'
 
 urlpatterns = [
     # Chat streaming endpoint
-    path('chat/', views.chat_stream_view, name='chat_stream'),
+    # path('chat/', views.chat_stream_view, name='chat_stream'),
     
     # Conversation management endpoints
     path('conversations/', views.get_conversations, name='all_conversations'),

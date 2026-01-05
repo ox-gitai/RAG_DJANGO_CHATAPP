@@ -20,3 +20,6 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
+# daphne core.asgi:application -b 0.0.0.0 -p 8000
