@@ -1067,9 +1067,10 @@ const ChatPage = () => {
     const [currentMessages, setCurrentMessages] = useState([]);
     const [inputMessage, setInputMessage] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
     const [error, setError] = useState('');
     const [websocket, setWebsocket] = useState(null); // New state for WebSocket instance
+    const [isWsReady, setIsWsReady] = useState(false); // Track if WS is truly open
 
     const isLogin = useStore((state) => state.isLogin);
     const messagesEndRef = useRef(null);
@@ -1157,8 +1158,8 @@ const ChatPage = () => {
     };
 
     // WebSocket Initialization and Management
-    useEffect(() => {
-        let ws = null; // Local variable to track the socket in this effect
+     useEffect(() => {
+        let ws = null;
 
         const setupWebSocket = async () => {
             const accessToken = localStorage.getItem('access_token');
@@ -1170,17 +1171,23 @@ const ChatPage = () => {
             const freshAccessToken = await checkAndRefresh();
             if (!freshAccessToken) return;
 
-            // Always close existing connection before creating a new one
+
             if (websocket && websocket.readyState === WebSocket.OPEN) {
                 websocket.close();
             }
 
-            let wsUrl = `${WS_BASE_URL}/ws/chat/?token=${freshAccessToken}`;
+            // Construct URL with conversation ID if available
+            const baseUrl = `${WS_BASE_URL}/ws/chat`;
+            let wsUrl = currentConversationId 
+                ? `${baseUrl}/${currentConversationId}/?token=${freshAccessToken}` 
+                : `${baseUrl}/?token=${freshAccessToken}`;
+            
             ws = new WebSocket(wsUrl);
 
             ws.onopen = () => {
                 console.log('WebSocket connection opened.');
                 setError('');
+                setIsWsReady(true);
             };
 
             ws.onmessage = (event) => {
@@ -1210,6 +1217,7 @@ const ChatPage = () => {
 
                 if (data.type === 'chat_message') {
                     const contentPart = data.content_part;
+                    setIsLoading(false); 
                     setCurrentMessages(prev => {
                         const msgs = [...prev];
                         if (msgs.length > 0 && msgs[msgs.length - 1]?.role === 'assistant') {
@@ -1235,9 +1243,11 @@ const ChatPage = () => {
             ws.onerror = (error) => {
                 console.error('WebSocket Error:', error);
                 setIsLoading(false);
+                setIsWsReady(false);
             };
 
             ws.onclose = (event) => {
+                setIsWsReady(false);
                 if (event.code === 4001) {
                     navigate('/login');
                 }
@@ -1246,6 +1256,7 @@ const ChatPage = () => {
             setWebsocket(ws);
         };
 
+        setIsWsReady(false); // Reset ready state before setting up new socket
         setupWebSocket();
 
         // Cleanup function
@@ -1253,6 +1264,7 @@ const ChatPage = () => {
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.close();
             }
+            setIsWsReady(false);
         };
         // Dependency array: Re-run only when conversation ID changes or nav changes
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1827,7 +1839,7 @@ const ChatPage = () => {
                         value={inputMessage}
                         onChange={(e) => setInputMessage(e.target.value)}
                         placeholder="Type your message..."
-                        disabled={isLoading || !websocket || websocket.readyState !== WebSocket.OPEN}
+                        disabled={isLoading || !isWsReady}
                         style={{
                                 width:'800px',
                                 flex: 1,
@@ -1853,7 +1865,7 @@ const ChatPage = () => {
                     <button
                         type="submit"
                         title="Send"
-                        disabled={isLoading || !inputMessage.trim() || !websocket || websocket.readyState !== WebSocket.OPEN}
+                        disabled={isLoading || !inputMessage.trim() || !isWsReady}
                         style={{
                                 padding: '12px 20px',
                                 background: isLoading

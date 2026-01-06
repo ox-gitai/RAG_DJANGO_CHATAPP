@@ -94,35 +94,38 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 "content": "Thinking..."
             }))
 
-            # --- NETWORK OPERATION: OLLAMA STREAMING ---
+
             assistant_response_content = ""
             try:
                 async with httpx.AsyncClient(timeout=OLLAMA_TIMEOUT) as client:
-                    response = await client.post(
+                    # CHANGE: Use client.stream instead of client.post
+                    async with client.stream(
+                        "POST",
                         OLLAMA_API_URL,
                         json={"model": MODEL_NAME, "messages": messages, "stream": True},
                         follow_redirects=True
-                    )
-                    response.raise_for_status()
+                    ) as response:
+                        
+                        response.raise_for_status()
 
-                    async for chunk_line in response.aiter_lines():
-                        if chunk_line:
-                            try:
-                                chunk = json.loads(chunk_line)
-                                if chunk.get('done'):
-                                    break
-                                if chunk.get('message', {}).get('content'):
-                                    content_part = chunk['message']['content']
-                                    assistant_response_content += content_part
-                                    
-                                    await self.send(text_data=json.dumps({
-                                        "type": "chat_message",
-                                        "role": "assistant",
-                                        "content_part": content_part,
-                                        "conversation_id": str(conversation.id)
-                                    }))
-                            except json.JSONDecodeError:
-                                continue
+                        async for chunk_line in response.aiter_lines():
+                            if chunk_line:
+                                try:
+                                    chunk = json.loads(chunk_line)
+                                    if chunk.get('done'):
+                                        break
+                                    if chunk.get('message', {}).get('content'):
+                                        content_part = chunk['message']['content']
+                                        assistant_response_content += content_part
+
+                                        await self.send(text_data=json.dumps({
+                                            "type": "chat_message",
+                                            "role": "assistant",
+                                            "content_part": content_part,
+                                            "conversation_id": str(conversation.id)
+                                        }))
+                                except json.JSONDecodeError:
+                                    continue
 
             except Exception as e:
                 logger.error(f"Ollama error: {str(e)}")

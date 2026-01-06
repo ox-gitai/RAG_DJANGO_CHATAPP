@@ -31,5 +31,7 @@ class JWTAuthMiddleware:
 
         return await self.inner(scope, receive, send)
 
+
 def JWTAuthMiddlewareStack(inner):
-    return JWTAuthMiddleware(AuthMiddlewareStack(inner))
+    # return JWTAuthMiddleware(AuthMiddlewareStack(inner))
+     return AuthMiddlewareStack(JWTAuthMiddleware(inner))
