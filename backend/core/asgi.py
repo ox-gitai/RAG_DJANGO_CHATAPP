@@ -10,26 +10,29 @@ https://docs.djangoproject.com/en/5.2/howto/deployment/asgi/
 import os
 import django
 
-# 1. Set the settings module first
+# Set the settings module 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'core.settings')
 
-# 2. Explicitly setup Django. 
+# Explicitly setup Django. 
 # This loads settings and populates the app registry (models).
 # We do this BEFORE importing anything else that might touch the database.
 django.setup()
 
-# 3. Now it is safe to import Django utilities and your project code
+# Now it is safe to import Django utilities and your project code
 from django.core.asgi import get_asgi_application
 from channels.routing import ProtocolTypeRouter, URLRouter
 from authentication.middleware import JWTAuthMiddlewareStack
 import getmodel.routing
 
-# 4. Initialize the default Django ASGI application for HTTP
+# Initialize the default Django ASGI application for HTTP
 django_asgi_app = get_asgi_application()
 
+# ProtocoalTypeRouter: It is the top-level router that inspects the type of connection (HTTP or WebSocket) and forwards it to the appropriate sub-application.
 application = ProtocolTypeRouter({
     "http": django_asgi_app,
     "websocket": JWTAuthMiddlewareStack(
+        # take the WebSocket URL patterns defined in the routings.py 
+        # and routes the connection to the correct consumer.
         URLRouter(
             getmodel.routing.websocket_urlpatterns
         )

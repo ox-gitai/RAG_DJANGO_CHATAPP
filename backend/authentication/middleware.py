@@ -1,4 +1,4 @@
-# RAG_DJANGO_CHATAPP-p1/backend/authentication/middleware.py
+
 from channels.db import database_sync_to_async
 from django.contrib.auth.models import AnonymousUser, User
 from channels.auth import AuthMiddlewareStack
@@ -30,6 +30,7 @@ class JWTAuthMiddleware:
             scope['user'] = AnonymousUser()
 
         return await self.inner(scope, receive, send)
+    
 
 
 def JWTAuthMiddlewareStack(inner):

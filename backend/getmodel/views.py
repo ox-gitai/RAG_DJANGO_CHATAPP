@@ -15,7 +15,7 @@ import uuid
 logger = logging.getLogger(__name__)
 
 OLLAMA_API_URL = "http://localhost:11434/api/chat"
-MODEL_NAME = "phi:2.7b"  # Change this to your desired model
+MODEL_NAME = "phi:2.7b"  
 OLLAMA_TIMEOUT = 300  # 5 minutes timeout for streaming
 
 
@@ -101,7 +101,7 @@ def chat_stream_view(request):
 def save_conversation(request, conversation_id):
     """
     Save or update a conversation.
-    Expects: { "messages": [...], "title": "..." (optional) }
+
     If title is not provided and conversation has 'New Conversation' as title,
     it will be auto-generated from first user message (20 char limit).
     conversation_id comes from URL path parameter

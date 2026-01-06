@@ -15,17 +15,18 @@ OLLAMA_TIMEOUT = 300
 
 class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
-        # 1. Get User
+        # Get User
         self.user = self.scope["user"]
 
-        # 2. Check Auth (Safe on AnonymousUser, but if it's a LazyObject this forces eval)
+        # Check Auth ,Safe on AnonymousUser, but if it's a lazyObject this forces eval
+        # Basically we logout of the system if any AnonymousUser
         if self.user.is_anonymous:
             await self.close(code=4001) 
             return
 
         self.conversation_id = self.scope['url_route']['kwargs'].get('conversation_id')
 
-        # 3. Determine Group Name
+        # Determine Group Name
         if self.conversation_id:
             self.conversation_group_name = f'chat_{self.conversation_id}'
         else:
@@ -63,14 +64,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 await self.send(text_data=json.dumps({"error": "Authentication required."}))
                 return
 
-            # --- DB OPERATION 1: GET OR CREATE CONVERSATION ---
+            #  GET OR CREATE CONVERSATION
             conversation = None
             if conversation_id:
-                # This helper is wrapped in @database_sync_to_async
+                # helper is wrapped in @database_sync_to_async
                 conversation = await self.get_conversation_safe(conversation_id)
             
             if not conversation:
-                # This helper is also wrapped
+            
                 conversation = await self.create_conversation_safe()
                 
                 # Send update to frontend
@@ -84,11 +85,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 self.conversation_group_name = f'chat_{self.conversation_id}'
                 await self.channel_layer.group_add(self.conversation_group_name, self.channel_name)
 
-            # --- DB OPERATION 2: UPDATE MESSAGES ---
-            # We do this via a helper to ensure 'conversation.messages' access doesn't trigger sync issues
+            
+            # This is done via a helper to ensure 'conversation.messages' access doesn't trigger sync issues
             messages = await self.append_user_message_safe(conversation, user_message_content)
-
-            # Send "Thinking..."
+  
             await self.send(text_data=json.dumps({
                 "type": "status",
                 "content": "Thinking..."
@@ -98,7 +98,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             assistant_response_content = ""
             try:
                 async with httpx.AsyncClient(timeout=OLLAMA_TIMEOUT) as client:
-                    # CHANGE: Use client.stream instead of client.post
+                    # Use client.stream instead of client.post
                     async with client.stream(
                         "POST",
                         OLLAMA_API_URL,
@@ -137,7 +137,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             finally:
                 await self.send(text_data=json.dumps({"type": "done", "conversation_id": str(conversation.id)}))
 
-            # --- DB OPERATION 3: SAVE FINAL RESPONSE ---
+            # SAVE FINAL RESPONSE 
             if assistant_response_content:
                 await self.append_assistant_message_safe(conversation, assistant_response_content)
 
@@ -148,9 +148,7 @@ class ChatConsumer(AsyncWebsocketConsumer):
             logger.error(f"Error receiving WebSocket message: {str(e)}")
             await self.send(text_data=json.dumps({"error": "An internal server error occurred."}))
 
-    # ------------------------------------------------------------------
-    # DATABASE HELPERS (ALL WRAPPED)
-    # ------------------------------------------------------------------
+    # --------------Databse Helpers [wrapped]--------------
 
     @database_sync_to_async
     def get_conversation_safe(self, conversation_id):
