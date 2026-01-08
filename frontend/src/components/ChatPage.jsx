@@ -3,6 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faMessage, faPaperPlane, faArrowAltCircleRight, faPenToSquare } from '@fortawesome/free-regular-svg-icons';
 import { ShimmeringText } from './ui/shimmering-text';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { materialDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
+// import remark from 'remark'; --- IGNORE ---
 // import { useStore } from './Store';
 import GlassSurface from './ui/LiquidGlass';
 const ChatPage = () => {
@@ -789,7 +794,34 @@ const ChatPage = () => {
                                                 ? '0 8px 16px rgba(205, 0, 30, 0.2)'
                                                 : 'none'
                                         }}>
-                                    {msg.content}
+                                    {msg.role === 'assistant' ? (
+                                        <ReactMarkdown 
+                                                style={{borderRadius: '8px'}}
+                                                remarkPlugins={[remarkGfm]}
+                                                components={{
+                                                    code (props){
+                                                        const {children, className, node, ...rest} = props;
+                                                        const match = /language-(\w+)/.exec(className || '');
+                                                        return match ? (
+                                                            <SyntaxHighlighter
+                                                            {...rest}
+                                                            preTag="div"
+                                                            children={String(children)}
+                                                            language={match[1]}
+                                                            style={materialDark}
+                                                            >
+                                                                
+                                                            </SyntaxHighlighter>
+                                                ) : (
+                                                    <code {...rest} className={className}>
+                                                        {children}
+                                                    </code>
+                                                )}
+                                                }}
+                                                >{msg.content}</ReactMarkdown>
+                                    ) : (
+                                        msg.content
+                                    )}
                                 </div>
                             </div>
                         ))}
