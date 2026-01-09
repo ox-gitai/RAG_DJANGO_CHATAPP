@@ -160,7 +160,7 @@ REST_FRAMEWORK = {
 from datetime import timedelta
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(seconds=2), # Example: 15 minutes
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60), # Example: 15 minutes
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),   # Example: 7 days
     # ... other settings
 }
