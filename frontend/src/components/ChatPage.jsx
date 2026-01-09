@@ -21,6 +21,9 @@ const ChatPage = () => {
     const [error, setError] = useState('');
     const [websocket, setWebsocket] = useState(null); 
     const [isWsReady, setIsWsReady] = useState(false); 
+    const currentConversationIdRef = useRef(currentConversationId);
+    const incomingBufferRef = useRef(''); 
+    const lastRenderedTimeRef = useRef(0);
 
     // const isLogin = useStore((state) => state.isLogin);
     const messagesEndRef = useRef(null);
@@ -84,7 +87,8 @@ const ChatPage = () => {
 
     // Check token validity and refresh if needed
     const checkAndRefresh = async () => {
-        const token = localStorage.getItem('access_token');
+        let token = localStorage.getItem('access_token');
+        
         if (!token) {
             navigate('/login');
             return null;
@@ -93,14 +97,14 @@ const ChatPage = () => {
         const decoded = parseJwt(token);
         const currentTime = Math.floor(Date.now() / 1000);
 
-        // Refresh if expiring in the next 30 seconds
+        // If token is invalid or expiring in < 30s
         if (!decoded.exp || decoded.exp < currentTime + 30) {
-            const newAccessToken = await refreshToken();
-            if (!newAccessToken) {
+            console.log("Token expired/expiring, refreshing...");
+            token = await refreshToken(); // This returns the NEW string
+            if (!token) {
                 navigate('/login');
                 return null;
             }
-            return newAccessToken;
         }
         return token;
     };
@@ -116,8 +120,12 @@ const ChatPage = () => {
         };
     };
 
+    useEffect(() => {
+        currentConversationIdRef.current = currentConversationId;
+    }, [currentConversationId]);
+
     // WebSocket Initialization and Management
-     useEffect(() => {
+    useEffect(() => {
         let ws = null;
 
         const setupWebSocket = async () => {
@@ -130,12 +138,11 @@ const ChatPage = () => {
             const freshAccessToken = await checkAndRefresh();
             if (!freshAccessToken) return;
 
-
+            // Close existing global socket connection if it exists
             if (websocket && websocket.readyState === WebSocket.OPEN) {
                 websocket.close();
             }
 
-            // Construct URL with conversation ID if available
             const baseUrl = `${WS_BASE_URL}/ws/chat`;
             let wsUrl = socketScope
                 ? `${baseUrl}/${socketScope}/?token=${freshAccessToken}`
@@ -152,11 +159,11 @@ const ChatPage = () => {
             ws.onmessage = (event) => {
                 const data = JSON.parse(event.data);
                 
-                // IMPORTANT: Ignore messages from other conversations
-                // This prevents "ghost" messages if the previous stream is finishing up
+                // Use the Ref to get the actual current ID without closures
+                const activeId = currentConversationIdRef.current; 
 
-                // If the message has a conversation_id and it doesn't match the current one, ignore it
-                if (data.conversation_id && currentConversationId && data.conversation_id !== currentConversationId) {
+                // GHOSTING FIX: Ignore messages from background conversations
+                if (data.conversation_id && activeId && data.conversation_id !== activeId) {
                     return; 
                 }
 
@@ -172,32 +179,49 @@ const ChatPage = () => {
 
                 if (data.type === 'conversation_id_update') {
                     setCurrentConversationId(data.conversation_id);
-                    loadConversations(); 
+                    // Note: We don't strictly need to loadConversations() here if 
+                    // the optimistically added message is handling the UI
                     return;
                 }
 
+                // --- STREAMING CHUNK ---
                 if (data.type === 'chat_message') {
-                    const contentPart = data.content_part;
-                    setIsLoading(false); 
+                    // REMOVED: setIsLoading(false) - Don't stop loading yet!
+                    
+                    incomingBufferRef.current += data.content_part;
+
+                    // setCurrentMessages(prev => {
+                    //     const msgs = [...prev];
+                    //     const lastIndex = msgs.length - 1;
+                        
+                    //     // Append content to the placeholder we created in sendMessage
+                    //     if (msgs[lastIndex] && msgs[lastIndex].role === 'assistant') {
+                    //         const updatedMsg = {
+                    //             ...msgs[lastIndex],
+                    //             content: msgs[lastIndex].content + data.content_part,
+                    //             isStreaming: true
+                    //         };
+                    //         msgs[lastIndex] = updatedMsg;
+                    //     }
+                    //     return msgs;
+                    // });
+                } 
+                // --- STREAM FINISHED ---
+                // MOVED: Outside of the 'chat_message' block
+                else if (data.type === 'done') {
+                    setIsLoading(false); // NOW we stop loading
+                    
                     setCurrentMessages(prev => {
                         const msgs = [...prev];
-                        if (msgs.length > 0 && msgs[msgs.length - 1]?.role === 'assistant') {
-                            msgs[msgs.length - 1].content += contentPart;
-                        } else {
-                            msgs.push({ role: 'assistant', content: contentPart });
+                        const lastIndex = msgs.length - 1;
+                        if (msgs[lastIndex]) {
+                            msgs[lastIndex].isStreaming = false; // Remove styling flag
                         }
                         return msgs;
                     });
-                }
-
-                if (data.type === 'done') {
-                    setIsLoading(false);
-                    // Refresh conversation list to get updated titles
-                    if (currentConversationId) {
-                         // We don't call selectConversation here to avoid UI flicker, 
-                         // but we might want to update the sidebar title eventually.
-                         loadConversations();
-                    }
+                    
+                    // Refresh list to update titles in sidebar if it was a new chat
+                    loadConversations();
                 }
             };
 
@@ -217,19 +241,17 @@ const ChatPage = () => {
             setWebsocket(ws);
         };
 
-        setIsWsReady(false); // Reset ready state before setting up new socket
+        setIsWsReady(false); 
         setupWebSocket();
 
-        // Cleanup function
+        // Cleanup: Close the LOCAL 'ws' variable to prevent race conditions
         return () => {
             if (ws && ws.readyState === WebSocket.OPEN) {
                 ws.close();
             }
             setIsWsReady(false);
         };
-        // Dependency array: Re-run only when conversation ID changes or nav changes
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [socketScope, navigate]); // Re-run if websocket or nav changes
+    }, [socketScope, navigate]);// Re-run if websocket or nav changes
 
     // Initial check for authentication and load conversations
     useEffect(() => {
@@ -331,33 +353,46 @@ const ChatPage = () => {
     const sendMessage = async (e) => {
         e.preventDefault();
 
+        // 1. Validation: Ensure connection is open and input is valid
         if (!inputMessage.trim() || isLoading || !websocket || websocket.readyState !== WebSocket.OPEN) {
             if (!websocket || websocket.readyState !== WebSocket.OPEN) {
                 setError("WebSocket is not connected. Attempting to reconnect...");
-                // Optionally trigger a reconnect here or advise user to refresh
-                // For now, let's just log and block
                 console.warn("WebSocket not open or not initialized.");
             }
             return;
         }
 
-        const userMessage = { role: 'user', content: inputMessage };
-        setCurrentMessages(prev => [...prev, userMessage]);
+        const contentToSend = inputMessage; // Capture value before clearing state
+        const userMessage = { role: 'user', content: contentToSend };
+
+        // 2. OPTIMISTIC UPDATE
+        // Append the User message AND an empty Assistant placeholder immediately.
+        // 'isStreaming: true' can be used for CSS styling (e.g., a blinking cursor)
+        setCurrentMessages(prev => [
+            ...prev, 
+            userMessage, 
+            { role: 'assistant', content: '', isStreaming: true } 
+        ]);
+
         setInputMessage('');
         setIsLoading(true);
         setError('');
 
         try {
-            // Send message over WebSocket
+            // 3. Send payload
             websocket.send(JSON.stringify({
-                message: userMessage.content,
-                conversation_id: currentConversationId // Pass the current ID, or null for new chat
+                message: contentToSend,
+                conversation_id: currentConversationId 
             }));
 
         } catch (err) {
             console.error('Error sending message via WebSocket:', err);
             setError('Failed to send message via WebSocket.');
             setIsLoading(false);
+            
+            // Optional: Revert UI state if sending fails purely on the client side
+            setCurrentMessages(prev => prev.slice(0, -2)); 
+            setInputMessage(contentToSend);
         }
     };
 
@@ -401,6 +436,45 @@ const ChatPage = () => {
         }
         navigate('/login');
     };
+
+    // a specialized Effect loop to flush the buffer to UI
+    useEffect(() => {
+        let animationFrameId;
+
+        const renderLoop = (timestamp) => {
+            // If there is text in the buffer waiting to be rendered
+            if (incomingBufferRef.current) {
+                
+                // Limit updates to ~30fps or 60fps to save CPU
+                if (timestamp - lastRenderedTimeRef.current > 16) { // ~60fps
+                    const textChunk = incomingBufferRef.current;
+                    incomingBufferRef.current = ''; // Clear buffer
+                    lastRenderedTimeRef.current = timestamp;
+
+                    setCurrentMessages(prev => {
+                        const msgs = [...prev];
+                        const lastIndex = msgs.length - 1;
+                        if (msgs[lastIndex] && msgs[lastIndex].role === 'assistant') {
+                            // Create new object to trigger render
+                            msgs[lastIndex] = {
+                                ...msgs[lastIndex],
+                                content: msgs[lastIndex].content + textChunk,
+                                isStreaming: true
+                            };
+                        }
+                        return msgs;
+                    });
+                }
+            }
+            animationFrameId = requestAnimationFrame(renderLoop);
+        };
+
+        if (isLoading) {
+            animationFrameId = requestAnimationFrame(renderLoop);
+        }
+
+        return () => cancelAnimationFrame(animationFrameId);
+    }, [isLoading]);
 
     return (
     <div style={{
@@ -617,6 +691,7 @@ const ChatPage = () => {
             position: 'relative',
             zIndex: 1, // Base layer
             // No blur here directly, the backdrop div covers this
+            // borderRadius: '20px',
         }}>
             
             {/* Header - Z-index reduced below backdrop */}
@@ -793,35 +868,36 @@ const ChatPage = () => {
                                                 ? '0 8px 16px rgba(205, 0, 30, 0.2)'
                                                 : 'none'
                                         }}>
-                                            <ReactMarkdown remarkPlugins={[remarkGfm]}
-                                                            components={{
-                                                                code({node, inline, className, children, ...props}) {
-                                                                    const match = /language-(\w+)/.exec(className || '');
-                                                                    return !inline && match ? (
-                                                                        <SyntaxHighlighter
-                                                                            style={materialDark}
-                                                                            language={match[1]}
-                                                                            PreTag="div"
-                                                                            // codeTagProps={{
-                                                                            // style: {
-                                                                            // scrollbarWidth: 'thin', // For Firefox
-                                                                            // }
-                                                                            // }}
-                                                                            customStyle={{
-                                                                                borderRadius: '12px',
-                                                                                border: '1px solid rgba(255, 255, 255, 0.1)',
-                                                                                overflow: 'auto',
-                                                                                msOverflowStyle: 'none',
-                                                                                scrollbarWidth: 'none',
-                                                                            }}
-                                                                        >
-                                                                            {String(children).replace(/\n$/, '')}
-                                                                        </SyntaxHighlighter>
-                                                                    ) : (
-                                                                        <code {...props}>{children}</code>
-                                                                    );
-                                                                }
-                                                            }}>{msg.content}</ReactMarkdown>
+                                            <ReactMarkdown 
+                                                remarkPlugins={[remarkGfm]}
+                                                components={{
+                                                    code({node, inline, className, children, ...props}) {
+                                                        const match = /language-(\w+)/.exec(className || '');
+                                                        return !inline && match ? (
+                                                            <SyntaxHighlighter
+                                                                style={materialDark}
+                                                                language={match[1]}
+                                                                PreTag="div"
+                                                                // codeTagProps={{
+                                                                // style: {
+                                                                // scrollbarWidth: 'thin', // For Firefox
+                                                                // }
+                                                                // }}
+                                                                customStyle={{
+                                                                    borderRadius: '12px',
+                                                                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                                                                    overflow: 'auto',
+                                                                    msOverflowStyle: 'none',
+                                                                    scrollbarWidth: 'none',
+                                                                }}
+                                                            >
+                                                                {String(children).replace(/\n$/, '')}
+                                                            </SyntaxHighlighter>
+                                                        ) : (
+                                                            <code {...props}>{children}</code>
+                                                        );
+                                                    }
+                                                }}>{msg.content}</ReactMarkdown>
                                 </div>
                             </div>
                         ))}

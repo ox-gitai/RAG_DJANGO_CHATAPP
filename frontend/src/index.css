@@ -11,3 +11,9 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+pre {
+  min-height: 2.5em; /* Prevents height jumping on first line */
+  transition: all 0.2s ease;
+  overflow-x: auto;
+}

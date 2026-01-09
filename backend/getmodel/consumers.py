@@ -15,18 +15,20 @@ OLLAMA_TIMEOUT = 300
 
 class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
-        # Get User
         self.user = self.scope["user"]
 
-        # Check Auth ,Safe on AnonymousUser, but if it's a lazyObject this forces eval
-        # Basically we logout of the system if any AnonymousUser
+        # Debug log
+        print(f"Consumer Connection Attempt: {self.user}")
+
         if self.user.is_anonymous:
+            # Accept strictly to send a close frame, then close
+            # (Browsers sometimes don't read the close code if you reject without accepting)
+            await self.accept()
             await self.close(code=4001) 
             return
 
         self.conversation_id = self.scope['url_route']['kwargs'].get('conversation_id')
 
-        # Determine Group Name
         if self.conversation_id:
             self.conversation_group_name = f'chat_{self.conversation_id}'
         else:
@@ -37,10 +39,6 @@ class ChatConsumer(AsyncWebsocketConsumer):
             self.channel_name
         )
         await self.accept()
-        
-        # Safe logging: Don't access database fields like username here to avoid async errors
-        logger.info(f"WebSocket connected for user_id {self.user.id}")
-
 
     async def disconnect(self, close_code):
         logger.info(f"WebSocket disconnected with code {close_code}")
@@ -91,7 +89,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
   
             await self.send(text_data=json.dumps({
                 "type": "status",
-                "content": "Thinking..."
+                "content": "Thinking...",
+                "conversation_id": str(conversation.id)
             }))
 
 
@@ -106,7 +105,8 @@ class ChatConsumer(AsyncWebsocketConsumer):
                         follow_redirects=True
                     ) as response:
                         
-                        response.raise_for_status()
+                        if response.status_code != 200:
+                            raise Exception(f"Ollama API Error: {response.status_code}")
 
                         async for chunk_line in response.aiter_lines():
                             if chunk_line:
@@ -114,10 +114,11 @@ class ChatConsumer(AsyncWebsocketConsumer):
                                     chunk = json.loads(chunk_line)
                                     if chunk.get('done'):
                                         break
-                                    if chunk.get('message', {}).get('content'):
-                                        content_part = chunk['message']['content']
+                                    content_part = chunk.get('message', {}).get('content', '')
+                                    if content_part:
                                         assistant_response_content += content_part
-
+                                        
+                                        # Send chunk to frontend
                                         await self.send(text_data=json.dumps({
                                             "type": "chat_message",
                                             "role": "assistant",
@@ -127,27 +128,31 @@ class ChatConsumer(AsyncWebsocketConsumer):
                                 except json.JSONDecodeError:
                                     continue
 
+            except httpx.ReadTimeout:
+                # Handle Model Timeout specifically
+                await self.send(text_data=json.dumps({
+                    "type": "error", 
+                    "content": "Model timed out generating response."
+                }))
             except Exception as e:
                 logger.error(f"Ollama error: {str(e)}")
                 await self.send(text_data=json.dumps({
                     "type": "error",
-                    "content": "Error connecting to AI model."
+                    "content": f"AI Error: {str(e)}"
                 }))
-                return
             finally:
-                await self.send(text_data=json.dumps({"type": "done", "conversation_id": str(conversation.id)}))
+                # IMPORTANT: Always save what we have, even if partial
+                if assistant_response_content:
+                    await self.append_assistant_message_safe(conversation, assistant_response_content)
+                
+                # Signal frontend that stream is dead/done
+                await self.send(text_data=json.dumps({
+                    "type": "done", 
+                    "conversation_id": str(conversation.id)
+                }))
 
-            # SAVE FINAL RESPONSE 
-            if assistant_response_content:
-                await self.append_assistant_message_safe(conversation, assistant_response_content)
-
-        except json.JSONDecodeError:
-            await self.send(text_data=json.dumps({"error": "Invalid JSON format"}))
         except Exception as e:
-            # Don't access self.user.username here just in case
-            logger.error(f"Error receiving WebSocket message: {str(e)}")
-            await self.send(text_data=json.dumps({"error": "An internal server error occurred."}))
-
+            logger.error(f"General WebSocket error: {e}")
     # --------------Databse Helpers [wrapped]--------------
 
     @database_sync_to_async

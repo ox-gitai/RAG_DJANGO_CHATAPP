@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import { useEffect, useState, useRef, useId } from 'react';
+import React, { useEffect, useState, useRef, useId } from 'react';
 import './LiquidGlass.css';
 
 const GlassSurface = ({
@@ -229,4 +229,4 @@ const GlassSurface = ({
   );
 };
 
-export default GlassSurface;
+export default React.memo(GlassSurface);

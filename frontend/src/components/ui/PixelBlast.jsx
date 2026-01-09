@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { EffectComposer, EffectPass, RenderPass, Effect } from 'postprocessing';
 import './PixelBlast.css';
@@ -650,4 +650,4 @@ const PixelBlast = ({
   );
 };
 
-export default PixelBlast;
+export default React.memo(PixelBlast);
