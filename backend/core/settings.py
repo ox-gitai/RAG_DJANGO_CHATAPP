@@ -164,3 +164,12 @@ SIMPLE_JWT = {
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),   # Example: 7 days
     # ... other settings
 }
+
+
+
+OLLAMA_CONFIG = {
+    "URL": "http://localhost:11434/api/chat",
+    # Change this to the model you want to use everywhere
+    "MODEL": "llama3.2:1b", 
+    "TIMEOUT": 300
+}

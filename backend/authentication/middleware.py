@@ -14,7 +14,7 @@ def get_user(token_key):
         user_id = access_token.payload['user_id']
         return User.objects.get(id=user_id)
     except (InvalidToken, TokenError, User.DoesNotExist, jwt.exceptions.DecodeError, KeyError) as e:
-        print(f"WebSocket Auth Error: {str(e)}") # Debug log
+        # print(f"WebSocket Auth Error: {str(e)}") # Debug log
         return AnonymousUser()
 
 class JWTAuthMiddleware:

@@ -6,12 +6,15 @@ from channels.db import database_sync_to_async
 from django.contrib.auth.models import AnonymousUser 
 
 from .models import Conversation
+from .views import MODEL_NAME 
+from django.conf import settings # <--- Import this
 
 logger = logging.getLogger(__name__)
 
-OLLAMA_API_URL = "http://localhost:11434/api/chat"
-MODEL_NAME = "phi:2.7b"
-OLLAMA_TIMEOUT = 300 
+
+OLLAMA_API_URL = settings.OLLAMA_CONFIG['URL']
+MODEL_NAME = settings.OLLAMA_CONFIG['MODEL']
+OLLAMA_TIMEOUT = settings.OLLAMA_CONFIG['TIMEOUT']
 
 class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -145,7 +148,10 @@ class ChatConsumer(AsyncWebsocketConsumer):
                 if assistant_response_content:
                     await self.append_assistant_message_safe(conversation, assistant_response_content)
                 
-                # Signal frontend that stream is dead/done
+                # 2. Attempt to update title (Fire and forget, essentially)
+                await self.update_title_if_needed(conversation.id)
+
+                # 3. Tell frontend we are done
                 await self.send(text_data=json.dumps({
                     "type": "done", 
                     "conversation_id": str(conversation.id)
@@ -188,12 +194,40 @@ class ChatConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def append_assistant_message_safe(self, conversation, content):
-        """Safely append assistant message and save"""
+        """
+        Safely append assistant message.
+        Uses update_fields to minimize DB locking duration.
+        """
+        # 1. Reload from DB to ensure we have the latest 'messages' list
+        # (prevents overwriting if the user sent a msg while AI was thinking)
+        conversation.refresh_from_db() 
+        
         msgs = conversation.messages
         if not isinstance(msgs, list):
             msgs = []
             
         msgs.append({"role": "assistant", "content": content})
         conversation.messages = msgs
-        conversation.save() # This triggers the title auto-generation logic in models.py
+        
+        # 2. OPTIMIZATION: Only save the messages and updated_at fields
+        # This prevents overwriting 'title' or 'user' if they were modified elsewhere
+        conversation.save(update_fields=['messages', 'updated_at'])
+        
         return msgs
+    
+    
+    @database_sync_to_async
+    def update_title_if_needed(self, conversation_id):
+        try:
+            conversation = Conversation.objects.get(id=conversation_id)
+            # Only update if title is default and we have messages
+            if conversation.title == 'New Conversation' and conversation.messages:
+                first_user_msg = next((m for m in conversation.messages if m['role'] == 'user'), None)
+                if first_user_msg:
+                    content = first_user_msg.get('content', '').strip()
+                    if content:
+                        new_title = content.replace('\n', ' ')[:30].strip()
+                        conversation.title = new_title
+                        conversation.save(update_fields=['title'])
+        except Conversation.DoesNotExist:
+            pass
