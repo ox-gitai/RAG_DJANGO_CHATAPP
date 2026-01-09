@@ -2,7 +2,7 @@ from django.http import StreamingHttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework import status
 from .models import Conversation
@@ -14,8 +14,9 @@ import uuid
 
 logger = logging.getLogger(__name__)
 
+
 OLLAMA_API_URL = "http://localhost:11434/api/chat"
-MODEL_NAME = "phi:2.7b"  
+MODEL_NAME = "smollm:135m" #"phi:2.7b"  
 OLLAMA_TIMEOUT = 300  # 5 minutes timeout for streaming
 
 
@@ -346,6 +347,7 @@ def update_conversation_title(request, conversation_id):
 
 
 @api_view(['GET'])
+@permission_classes([AllowAny])
 def ollama_health_check(request):
     """Check if backend and Ollama are running (no authentication required)"""
     try:

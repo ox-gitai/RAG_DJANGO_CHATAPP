@@ -6,11 +6,12 @@ from channels.db import database_sync_to_async
 from django.contrib.auth.models import AnonymousUser 
 
 from .models import Conversation
+from .views import MODEL_NAME
 
 logger = logging.getLogger(__name__)
 
 OLLAMA_API_URL = "http://localhost:11434/api/chat"
-MODEL_NAME = "phi:2.7b"
+# MODEL_NAME imported from views
 OLLAMA_TIMEOUT = 300 
 
 class ChatConsumer(AsyncWebsocketConsumer):
