@@ -16,6 +16,8 @@ Including another URLconf
 """
 
 from django.urls import path, include
+from authentication.views import RegisterView, CustomTokenObtainPairView, get_public_key # Import new views
+from rest_framework_simplejwt.views import TokenRefreshView
 from authentication.views import RegisterView
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from drf_spectacular.views import (
@@ -27,7 +29,8 @@ from drf_spectacular.views import (
 
 
 urlpatterns = [
-    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    # path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+     path('api/token/', CustomTokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('api/register/', RegisterView.as_view(), name='auth_register'),
 
@@ -41,5 +44,7 @@ urlpatterns = [
 
  	# ReDoc UI
  	path('api/schema/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
+    
+    path('api/auth/public-key/', get_public_key, name='public_key'),
 
 ]

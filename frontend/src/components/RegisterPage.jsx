@@ -112,7 +112,7 @@ const Register = () => {
                     overflow: 'hidden', // Clips the glass canvas
                     boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
                     border: '1px solid rgba(255, 255, 255, 0.1)',
-                    pointerEvents: 'auto', // Re-enable clicks for form
+                    pointerEvents: 'none', // Re-enable clicks for form
                     transform: 'translateZ(0)'
                 }}>
 
@@ -225,7 +225,7 @@ const Register = () => {
                         {/* Form */}
                         <form onSubmit={handleRegister}>
                             <div style={{ marginBottom: '1.25rem' }}>
-                                <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: 'rgba(255,255,255,0.8)', marginBottom: '0.75rem', marginLeft: '4px' }}>
+                                <label style={{display: 'block', fontSize: '13px', fontWeight: 600, color: 'rgba(255,255,255,0.8)', marginBottom: '0.75rem', marginLeft: '4px' }}>
                                     Username
                                 </label>
                                 <input
@@ -236,6 +236,7 @@ const Register = () => {
                                     required 
                                     disabled={isLoading} 
                                     placeholder="Choose a username"
+                                    style={{pointerEvents: isLoading ? 'none' : 'auto'}} 
                                 />
                             </div>
 
@@ -251,6 +252,7 @@ const Register = () => {
                                     required 
                                     disabled={isLoading} 
                                     placeholder="Minimum 6 characters"
+                                    style={{pointerEvents: isLoading ? 'none' : 'auto'}}
                                 />
                             </div>
 
@@ -266,10 +268,14 @@ const Register = () => {
                                     required 
                                     disabled={isLoading} 
                                     placeholder="Re-enter your password"
+                                    style={{pointerEvents: isLoading ? 'none' : 'auto'}}
                                 />
                             </div>
 
-                            <button type="submit" className="apple-button" disabled={isLoading}>
+                            <button type="submit" 
+                                    className="apple-button" 
+                                    disabled={isLoading} 
+                                    style={{pointerEvents: isLoading?"none":"auto"}}>
                                 {isLoading ? (
                                     <><span style={{ display: 'inline-block', width: '16px', height: '16px', marginRight: '8px', borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', animation: 'spin 0.8s linear infinite' }} /> Creating...</>
                                 ) : "Create Account"}
@@ -277,7 +283,7 @@ const Register = () => {
                         </form>
 
                         {/* Footer */}
-                        <div style={{ marginTop: '2rem', textAlign: 'center' }}>
+                        <div style={{ marginTop: '2rem', textAlign: 'center', pointerEvents: isLoading?"none":"auto" }}>
                             <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '14px', margin: 0 }}>
                                 Already have an account?{' '}
                                 <Link to="/login" style={{ color: '#ff4b5c', textDecoration: 'none', fontWeight: 600, transition: 'opacity 0.2s' }}>

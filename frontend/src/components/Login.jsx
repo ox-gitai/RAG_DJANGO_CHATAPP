@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useStore } from './Store';
 import PixelBlast from './ui/PixelBlast';
-// 1. Import the GlassSurface component
 import GlassSurface from './ui/LiquidGlass'; 
+import JSEncrypt from 'jsencrypt';
+
 
 const Login = () => {
     const [username, setUsername] = useState('');
@@ -11,9 +12,25 @@ const Login = () => {
     const [message, setMessage] = useState('');
     const [messageType, setMessageType] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const navigate = useNavigate();
+    const [publicKey, setPublicKey] = useState('');
     const { setIsLogin } = useStore();
+    const navigate = useNavigate();
 
+
+    // fetch public key on mount
+    useEffect(() => {
+        fetch('http://127.0.0.1:8000/api/auth/public-key/')
+            .then(res => res.json())
+            .then(data => {
+                // Ensure your backend returns { "public_key": "-----BEGIN PUBLIC KEY..." }
+                setPublicKey(data.public_key);
+                console.log("RSA Public Key loaded.");
+            })
+            .catch(err => console.error("Failed to load public key:", err));
+    }, []);
+
+
+    
     const handleSubmit = async (e) => {
         e.preventDefault();
         setMessage('');
@@ -21,10 +38,33 @@ const Login = () => {
         setIsLoading(true);
 
         try {
+            let payloadPassword = password;
+
+            // 2. ENCRYPT THE PASSWORD
+            if (publicKey) {
+                const encryptor = new JSEncrypt();
+                encryptor.setPublicKey(publicKey);
+                const encrypted = encryptor.encrypt(password);
+                
+                if (!encrypted) {
+                    console.error("Encryption failed");
+                    setMessage("Security Error: Could not encrypt.");
+                    setIsLoading(false);
+                    return;
+                }
+                payloadPassword = encrypted; // Use the encrypted string
+            } else {
+                console.warn("No public key found! Sending plaintext (Insecure).");
+            }
+
+            // 3. SEND THE ENCRYPTED PAYLOAD
             const response = await fetch('http://127.0.0.1:8000/api/token/', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username: username.trim(), password: password })
+                body: JSON.stringify({ 
+                    username: username, 
+                    password: payloadPassword // <--- SEND ENCRYPTED VERSION
+                })
             });
 
             const data = await response.json();
@@ -32,22 +72,20 @@ const Login = () => {
             if (response.ok) {
                 localStorage.setItem('access_token', data.access);
                 localStorage.setItem('refresh_token', data.refresh);
-                setMessage('Login Successful!');
-                setMessageType('success');
                 setIsLogin(true);
-                setTimeout(() => navigate('/conversation'), 800);
+                navigate('/conversation');
             } else {
-                setMessage('Invalid credentials. Please try again.');
-                setMessageType('error');
+                setMessage('Invalid credentials.');
             }
         } catch (error) {
-            console.error('Network Error:', error);
-            setMessage('Server is down or unreachable');
-            setMessageType('error');
+            console.error('Login error:', error);
+            setMessage('Server error.');
         } finally {
             setIsLoading(false);
         }
     };
+
+    
 
     return (
         <div style={{
