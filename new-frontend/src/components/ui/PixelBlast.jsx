@@ -2,6 +2,47 @@ import React, { useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { EffectComposer, EffectPass, Effect } from 'postprocessing';
 
+const createTextTexture = () => {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('2D context not available');
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  texture.generateMipmaps = false;
+
+  const update = (w, h, text, showText = true) => {
+    // Use proper device pixel ratio for sharp text rendering
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
+
+    ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset transform
+    ctx.scale(dpr, dpr);
+    ctx.fillStyle = 'black';
+    ctx.fillRect(0, 0, w, h);
+
+    if (showText && text) {
+      ctx.fillStyle = 'white';
+      // Montserrat Extra Bold (weight 800)
+      ctx.font = '800 250px "Montserrat", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+
+      // Position: Center X, Extreme Bottom Y
+      ctx.fillText(text, w / 2, h);
+    }
+
+    texture.needsUpdate = true;
+  };
+
+  return {
+    texture,
+    update
+  };
+};
+
 const createTouchTexture = () => {
   const size = 64;
   const canvas = document.createElement('canvas');
@@ -9,7 +50,7 @@ const createTouchTexture = () => {
   canvas.height = size;
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('2D context not available');
-  
+
   ctx.fillStyle = 'black';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -21,10 +62,10 @@ const createTouchTexture = () => {
   const trail = [];
   let last = null;
   const maxAge = 64;
-  let baseRadius = 0.15 * size; 
+  let baseRadius = 0.15 * size;
 
   const clear = () => {
-    ctx.fillStyle = 'black'; 
+    ctx.fillStyle = 'black';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   };
 
@@ -38,8 +79,8 @@ const createTouchTexture = () => {
     else intensity = easeOutQuad(1 - (p.age - maxAge * 0.3) / (maxAge * 0.7)) || 0;
 
     intensity *= p.force;
-    
-    const spreadFactor = 1 + (p.age / maxAge) * 2.0; 
+
+    const spreadFactor = 1 + (p.age / maxAge) * 2.0;
     const currentRadius = baseRadius * spreadFactor;
 
     const c = intensity * 255;
@@ -48,12 +89,12 @@ const createTouchTexture = () => {
     const offset = size * 5;
     ctx.shadowOffsetX = offset;
     ctx.shadowOffsetY = offset;
-    
-    ctx.shadowBlur = currentRadius; 
+
+    ctx.shadowBlur = currentRadius;
     ctx.shadowColor = `rgba(${color},${intensity})`;
-    
+
     ctx.beginPath();
-    ctx.fillStyle = 'rgba(255,0,0,1)'; 
+    ctx.fillStyle = 'rgba(255,0,0,1)';
     ctx.arc(pos.x - offset, pos.y - offset, currentRadius, 0, Math.PI * 2);
     ctx.fill();
   };
@@ -129,6 +170,9 @@ uniform float uBrightness;
 
 uniform int       uEnableTrail;
 uniform sampler2D uTouchTexture;
+uniform sampler2D uTextTexture;
+uniform float     uTextFillDensity; // Controls dot density inside text (0.0 to 1.0)
+uniform float     uTextReveal;      // Animation progress (0.0 = hidden, 1.0 = fully revealed)
 
 uniform int   uShapeType;
 const int SHAPE_SQUARE   = 0;
@@ -230,7 +274,14 @@ void main(){
   // Apply brightness adjustment
   base = base + (uBrightness - 1.0) * 0.4;
 
-  float feed = base + (uDensity - 0.5) * 0.3;
+  // Gradient Density: Dense at top (~1.5x), sparse at bottom (~0.2x)
+  // gl_FragCoord.y is 0 at bottom, uResolution.y at top
+  float gradient = gl_FragCoord.y / uResolution.y; 
+  // Create significant contrast: 1.5 at top decreasing to 0.2 at bottom
+  float densityFactor = mix(0.05, 1.5, gradient);
+  float adjustedDensity = uDensity * densityFactor;
+
+  float feed = base + (adjustedDensity - 0.5) * 0.3;
 
   if (uEnableRipples == 1) {
     float speed     = uRippleSpeed;
@@ -251,8 +302,32 @@ void main(){
     }
   }
 
+  // Sample text texture
+  vec2 texUV = gl_FragCoord.xy / uResolution;
+  float textVal = texture(uTextTexture, texUV).r;
+  
+  // Create a "quiet zone" around text for better readability
+  // Reduce background density near text area (not just inside text)
+  float textProximity = smoothstep(0.0, 0.15, textVal); // Detects area around and inside text
+  float textCore = smoothstep(0.1, 0.3, textVal);       // Just the text letters
+  
+  // Reduce background feed in areas near text (quiet zone)
+  float quietZoneFactor = mix(1.0, 0.15, textProximity * uTextReveal);
+  feed *= quietZoneFactor;
+  
+  // Text is formed by pixels (dithered), not a hard cutout
+  // The text reveal animation controls how much the text density takes effect
+  if (textVal > 0.1) {
+    // Target density for text area
+    float targetTextFeed = uTextFillDensity * 0.8 + 0.1;
+    
+    // Blend between reduced background and text density based on reveal progress
+    float revealedTextFeed = mix(feed, targetTextFeed, uTextReveal * textCore);
+    
+    feed = revealedTextFeed;
+  }
+
   if (uEnableTrail == 1) {
-    vec2 texUV = gl_FragCoord.xy / uResolution;
     float touchVal = texture(uTouchTexture, texUV).r;
     feed = max(feed, touchVal * 1.5); 
   }
@@ -303,22 +378,27 @@ const PixelBlast = ({
   transparent = true,
   edgeFade = 0.5,
   noiseAmount = 0,
-  brightness = 1.0
+  brightness = 1.0,
+  // Text configuration props
+  showText = true,
+  displayText = 'DART',
+  textFillDensity = 0.75,
+  textRevealDuration = 5.0  // Duration in seconds for text to fully reveal
 }) => {
   const containerRef = useRef(null);
   const visibilityRef = useRef({ visible: true });
   const speedRef = useRef(speed);
   const threeRef = useRef(null);
   const prevConfigRef = useRef(null);
-  
+
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
     speedRef.current = speed;
-    
+
     const needsReinitKeys = ['noiseAmount', 'enableTrail'];
     const cfg = { noiseAmount, enableTrail };
-    
+
     let mustReinit = false;
     if (!threeRef.current) mustReinit = true;
     else if (prevConfigRef.current) {
@@ -351,20 +431,23 @@ const PixelBlast = ({
         preserveDrawingBuffer: true,
         premultipliedAlpha: false
       });
-      
+
       renderer.domElement.style.width = '100%';
       renderer.domElement.style.height = '100%';
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
       container.appendChild(renderer.domElement);
-      
+
       if (transparent) renderer.setClearAlpha(0);
       else renderer.setClearColor(0x000000, 1);
 
       let touch = null;
       if (enableTrail) {
         touch = createTouchTexture();
-        touch.radiusScale = trailRadius; 
+        touch.radiusScale = trailRadius;
       }
+
+      // Initialize text texture
+      const textTex = createTextTexture();
 
       const uniforms = {
         uResolution: { value: new THREE.Vector2(0, 0) },
@@ -386,7 +469,10 @@ const PixelBlast = ({
         uEdgeFade: { value: edgeFade },
         uBrightness: { value: brightness },
         uEnableTrail: { value: enableTrail ? 1 : 0 },
-        uTouchTexture: { value: touch ? touch.texture : null }
+        uTouchTexture: { value: touch ? touch.texture : null },
+        uTextTexture: { value: textTex.texture },
+        uTextFillDensity: { value: textFillDensity },
+        uTextReveal: { value: 0.0 }  // Start hidden, animate to 1.0
       };
 
       const scene = new THREE.Scene();
@@ -413,6 +499,9 @@ const PixelBlast = ({
         if (threeRef.current?.composer)
           threeRef.current.composer.setSize(renderer.domElement.width, renderer.domElement.height);
         uniforms.uPixelSize.value = pixelSize * renderer.getPixelRatio();
+
+        // Update text texture on resize
+        textTex.update(w, h, displayText, showText);
       };
       setSize();
       const ro = new ResizeObserver(setSize);
@@ -429,13 +518,13 @@ const PixelBlast = ({
       const timeOffset = randomFloat() * 1000;
 
       let composer;
-      
+
       if (noiseAmount > 0) {
         composer = new EffectComposer(renderer, {
-            alpha: true,
-            frameBufferType: THREE.HalfFloatType
+          alpha: true,
+          frameBufferType: THREE.HalfFloatType
         });
-        
+
         const renderPass = new THREE.RenderPass(scene, camera);
         composer.addPass(renderPass);
 
@@ -451,8 +540,8 @@ const PixelBlast = ({
         );
         const noisePass = new EffectPass(camera, noiseEffect);
         composer.addPass(noisePass);
-        
-        composer.passes[composer.passes.length-1].renderToScreen = true;
+
+        composer.passes[composer.passes.length - 1].renderToScreen = true;
         composer.setSize(renderer.domElement.width, renderer.domElement.height);
       }
 
@@ -485,18 +574,29 @@ const PixelBlast = ({
       renderer.domElement.addEventListener('pointermove', onPointerMove, { passive: true });
 
       let raf = 0;
+      let textRevealStartTime = null;
       const animate = () => {
         if (autoPauseOffscreen && !visibilityRef.current.visible) {
           raf = requestAnimationFrame(animate);
           return;
         }
         uniforms.uTime.value = timeOffset + clock.getElapsedTime() * speedRef.current;
-        
+
+        // Animate text reveal over the specified duration
+        if (textRevealStartTime === null) {
+          textRevealStartTime = clock.getElapsedTime();
+        }
+        const elapsed = clock.getElapsedTime() - textRevealStartTime;
+        const revealProgress = Math.min(elapsed / textRevealDuration, 1.0);
+        // Use easeOutCubic for smooth reveal animation
+        const eased = 1 - Math.pow(1 - revealProgress, 3);
+        uniforms.uTextReveal.value = eased;
+
         if (touch) touch.update();
 
         if (composer) {
-          if (transparent) renderer.clear(); 
-          
+          if (transparent) renderer.clear();
+
           composer.passes.forEach(p => {
             const effs = p.effects;
             if (effs)
@@ -526,7 +626,8 @@ const PixelBlast = ({
         quad,
         timeOffset,
         composer,
-        touch
+        touch,
+        textTex
       };
     } else {
       const t = threeRef.current;
@@ -536,19 +637,27 @@ const PixelBlast = ({
       t.uniforms.uScale.value = patternScale;
       t.uniforms.uDensity.value = patternDensity;
       t.uniforms.uPixelJitter.value = pixelSizeJitter;
-      
+
       t.uniforms.uEnableRipples.value = enableRipples ? 1 : 0;
       t.uniforms.uRippleIntensity.value = rippleIntensityScale;
       t.uniforms.uRippleThickness.value = rippleThickness;
       t.uniforms.uRippleSpeed.value = rippleSpeed;
-      
+
       t.uniforms.uEdgeFade.value = edgeFade;
       t.uniforms.uBrightness.value = brightness;
       t.uniforms.uEnableTrail.value = enableTrail ? 1 : 0;
+      t.uniforms.uTextFillDensity.value = textFillDensity;
+
+      // Update text texture with current props
+      if (t.textTex) {
+        const w = containerRef.current?.clientWidth || 1;
+        const h = containerRef.current?.clientHeight || 1;
+        t.textTex.update(w, h, displayText, showText);
+      }
 
       if (transparent) t.renderer.setClearAlpha(0);
       else t.renderer.setClearColor(0x000000, 1);
-      
+
       if (t.touch) t.touch.radiusScale = trailRadius;
     }
     prevConfigRef.current = cfg;
@@ -583,7 +692,11 @@ const PixelBlast = ({
     variant,
     color,
     speed,
-    brightness
+    brightness,
+    showText,
+    displayText,
+    textFillDensity,
+    textRevealDuration
   ]);
 
   return (

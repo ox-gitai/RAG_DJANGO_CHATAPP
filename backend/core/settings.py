@@ -167,4 +167,5 @@ SIMPLE_JWT = {
 }
 
 
+
 OLLAMA_MODEL = "smollm:135m"

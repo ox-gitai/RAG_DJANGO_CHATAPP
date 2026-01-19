@@ -78,19 +78,22 @@ const Register = () => {
                 <PixelBlast
                     variant="diamond"
                     color="#cd001e"
-                    pixelSize={4}
-                    patternScale={6}
+                    pixelSize={6}
+                    patternScale={5}
                     speed={0.5}
-                    edgeFade={0.1}
+                    edgeFade={0.04}
                     noiseAmount={0}
                     transparent={true}
                     enableRipples={true}
                     rippleIntensityScale={4.0}
                     rippleSpeed={0.4}
                     rippleThickness={0.15}
-                    liquid={true}
-                    liquidStrength={0.00}
-                    liquidRadius={0.15}
+                    enableTrail={true}
+                    trailRadius={0.15}
+                    brightness={1.2}  // Add this - adjust between 0.5 to 2.0 to your liking
+                    showText={true}
+                    displayText="D A R T"
+                    textFillDensity={0.25}
                 />
             </div>
 

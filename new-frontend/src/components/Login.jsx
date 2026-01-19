@@ -122,8 +122,8 @@ const Login = () => {
                 <PixelBlast
                     variant="diamond"
                     color="#cd001e"
-                    pixelSize={4}
-                    patternScale={6}
+                    pixelSize={6}
+                    patternScale={5}
                     speed={0.5}
                     edgeFade={0.04}
                     noiseAmount={0}
@@ -135,6 +135,9 @@ const Login = () => {
                     enableTrail={true}
                     trailRadius={0.15}
                     brightness={1.2}  // Add this - adjust between 0.5 to 2.0 to your liking
+                    showText={true}
+                    displayText="D A R T"
+                    textFillDensity={0.25}
                 />
             </div>
 
